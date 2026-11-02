@@ -6,5 +6,6 @@
 *.iml
 build
 frontend/node_modules
-compose*.yaml
+*compose*.yaml
+pgdata
 Dockerfile

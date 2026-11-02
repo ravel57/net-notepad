@@ -39,3 +39,6 @@ out/
 ### Kotlin ###
 .kotlin
 /.claude/
+
+### Database data of docker-compose.yaml ###
+/pgdata/

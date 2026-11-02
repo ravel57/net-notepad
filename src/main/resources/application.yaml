@@ -4,10 +4,11 @@ spring:
   sql:
     init:
       mode: always
-  docker:
-    compose:
-      # compose.yaml runs the whole application, development needs only the database
-      file: compose.dev.yaml
+  # Local database for development and tests; docker-compose.yaml overrides it with SPRING_DATASOURCE_* variables
+  datasource:
+    url: jdbc:postgresql://localhost:5432/netnotepad
+    username: netnotepad
+    password: netnotepad
 
 netnotepad:
   # Maximum note length in characters
@@ -16,6 +17,9 @@ netnotepad:
   idle-eviction: 60s
 
 server:
+  # Behind a reverse proxy: take scheme and client IP from X-Forwarded-* headers of trusted (private network) proxies.
+  # Needed for the WebSocket same-origin check over HTTPS and for per-IP limits.
+  forward-headers-strategy: native
   compression:
     enabled: true
   servlet:

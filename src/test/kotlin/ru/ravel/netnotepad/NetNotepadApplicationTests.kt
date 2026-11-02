@@ -28,11 +28,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-// Starts PostgreSQL from compose.dev.yaml
+// Needs the PostgreSQL database configured in application.yaml
 @SpringBootTest(
 	webEnvironment = WebEnvironment.RANDOM_PORT,
 	properties = [
-		"spring.docker.compose.skip.in-tests=false",
 		"netnotepad.limits.message-burst=40",
 		"netnotepad.limits.messages-per-second=1",
 	],
