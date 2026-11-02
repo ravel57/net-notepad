@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Net Notepad · не найдено</title>
+	<link rel="stylesheet" th:href="@{/css/app.css}">
+	<script th:src="@{/js/theme.js}"></script>
+</head>
+<body class="centered-page">
+<div class="card">
+	<h1>Заметка не найдена</h1>
+	<p class="muted">Возможно, она была удалена или истёк срок её жизни.</p>
+	<div class="actions">
+		<a class="button primary" th:href="@{/new}">Создать новую заметку</a>
+	</div>
+</div>
+</body>
+</html>

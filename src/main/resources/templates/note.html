@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title th:text="${readOnly} ? 'Net Notepad · только чтение' : |Net Notepad · ${key}|">Net Notepad</title>
+	<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='2' y='1' width='12' height='14' rx='2' fill='%234f6bed'/%3E%3Cpath d='M5 5h6M5 8h6M5 11h4' stroke='white' stroke-width='1.4'/%3E%3C/svg%3E">
+	<script th:src="@{/js/theme.js}"></script>
+	<link rel="stylesheet" th:href="@{/js/vendor.css}">
+	<link rel="stylesheet" th:href="@{/css/app.css}">
+	<script type="module" th:src="@{/js/app.js}"></script>
+</head>
+<body th:data-key="${key}" th:data-read-only="${readOnly}">
+<header class="toolbar">
+	<div class="brand">Net Notepad</div>
+	<div class="group">
+		<a class="button primary" th:href="@{/new}">+ Новая заметка</a>
+		<button id="copy-link" class="button" type="button">Скопировать ссылку</button>
+		<button id="share" class="button" type="button" title="Ссылки для редактирования и чтения, QR-код">Поделиться</button>
+	</div>
+	<div class="group">
+		<label class="select">
+			<span>Синтаксис</span>
+			<select id="syntax"></select>
+		</label>
+		<button id="preview-toggle" class="button toggle" type="button" aria-pressed="false"
+				title="Разделить экран у всех участников: текст и отрисованный Markdown">
+			Превью Markdown
+		</button>
+	</div>
+	<div class="group">
+		<button id="download" class="button" type="button" title="Скачать заметку файлом">Скачать</button>
+		<button id="upload" class="button" type="button" data-edit-only
+				title="Заменить заметку содержимым файла (можно перетащить файл в редактор)">Загрузить</button>
+		<input id="upload-input" type="file" hidden>
+		<button id="history" class="button" type="button" data-edit-only>История</button>
+		<button id="protection" class="button" type="button" data-edit-only title="Пароль и срок жизни">Доступ</button>
+		<button id="settings" class="button" type="button">Настройки</button>
+	</div>
+	<div class="presence-bar">
+		<div id="presence" class="presence"></div>
+		<div id="status" class="status" data-state="connecting">
+			<span class="dot"></span><span id="status-text">Подключение…</span>
+		</div>
+	</div>
+</header>
+<div id="banner" class="banner" hidden></div>
+<main id="workspace" class="workspace">
+	<section class="pane">
+		<div class="pane-title">Текст</div>
+		<div id="editor" class="pane-body"></div>
+	</section>
+	<section class="pane" hidden>
+		<div class="pane-title">Markdown</div>
+		<article id="preview" class="pane-body markdown-body"></article>
+	</section>
+</main>
+
+<dialog id="share-dialog" class="dialog" aria-labelledby="share-title">
+	<div class="dialog-body">
+		<h2 id="share-title">Поделиться</h2>
+		<div class="field" data-edit-only>
+			<label for="share-edit-link">Редактирование</label>
+			<div class="row">
+				<input id="share-edit-link" class="input" readonly>
+				<button class="button" type="button" data-copy="share-edit-link">Копировать</button>
+			</div>
+		</div>
+		<div class="field">
+			<label for="share-read-link">Только чтение</label>
+			<div class="row">
+				<input id="share-read-link" class="input" readonly>
+				<button class="button" type="button" data-copy="share-read-link">Копировать</button>
+			</div>
+		</div>
+		<div class="field">
+			<span class="label">QR-код</span>
+			<div id="qr-switch" class="segmented" data-edit-only>
+				<button type="button" data-qr="edit" aria-pressed="false">Редактирование</button>
+				<button type="button" data-qr="read" aria-pressed="false">Чтение</button>
+			</div>
+			<div id="qr" class="qr"></div>
+		</div>
+		<div class="actions">
+			<button class="button" type="button" data-close>Закрыть</button>
+		</div>
+	</div>
+</dialog>
+
+<dialog id="history-dialog" class="dialog wide" aria-labelledby="history-title">
+	<div class="dialog-body">
+		<h2 id="history-title">История версий</h2>
+		<p class="muted small">Снимки сохраняются автоматически не чаще раза в 5 минут, а также перед каждым восстановлением.</p>
+		<div class="history">
+			<ul id="history-list" class="history-list"></ul>
+			<pre id="history-content" class="history-content"></pre>
+		</div>
+		<div class="actions">
+			<button class="button" type="button" data-close>Закрыть</button>
+			<button id="history-restore" class="button primary" type="button" disabled>Восстановить</button>
+		</div>
+	</div>
+</dialog>
+
+<dialog id="protection-dialog" class="dialog" aria-labelledby="protection-title">
+	<div class="dialog-body">
+		<h2 id="protection-title">Доступ</h2>
+		<div class="field">
+			<label for="password-input">Пароль</label>
+			<p id="password-state" class="muted"></p>
+			<div class="row">
+				<input id="password-input" class="input" type="password" autocomplete="new-password" placeholder="Новый пароль">
+				<button id="password-set" class="button" type="button">Установить</button>
+			</div>
+			<button id="password-remove" class="button danger" type="button" hidden>Снять пароль</button>
+			<p class="muted small">Пароль запрашивается при открытии обеих ссылок. Уже подключённые участники сохраняют доступ.</p>
+		</div>
+		<div class="field">
+			<label for="ttl-select">Срок жизни</label>
+			<p id="ttl-state" class="muted"></p>
+			<div class="row">
+				<select id="ttl-select" class="input">
+					<option value="0">Без ограничения</option>
+					<option value="3600">1 час</option>
+					<option value="86400">1 день</option>
+					<option value="604800">7 дней</option>
+					<option value="2592000">30 дней</option>
+				</select>
+				<button id="ttl-apply" class="button" type="button">Применить</button>
+			</div>
+			<p class="muted small">По истечении срока заметка и её история удаляются у всех.</p>
+		</div>
+		<div class="actions">
+			<button class="button" type="button" data-close>Закрыть</button>
+		</div>
+	</div>
+</dialog>
+
+<dialog id="settings-dialog" class="dialog" aria-labelledby="settings-title">
+	<div class="dialog-body">
+		<h2 id="settings-title">Настройки</h2>
+		<div class="field">
+			<label for="pref-name">Ваше имя</label>
+			<input id="pref-name" class="input" maxlength="40">
+		</div>
+		<div class="field">
+			<span class="label">Цвет курсора</span>
+			<div id="pref-colors" class="swatches"></div>
+		</div>
+		<div class="field">
+			<label for="pref-theme">Тема</label>
+			<select id="pref-theme" class="input">
+				<option value="system">Как в системе</option>
+				<option value="light">Светлая</option>
+				<option value="dark">Тёмная</option>
+			</select>
+		</div>
+		<div class="field">
+			<label for="pref-font-size">Размер шрифта: <span id="pref-font-size-value"></span></label>
+			<input id="pref-font-size" type="range" min="11" max="22">
+		</div>
+		<label class="check"><input id="pref-wrap" type="checkbox"> Перенос строк</label>
+		<label class="check"><input id="pref-line-numbers" type="checkbox"> Номера строк</label>
+		<p class="muted small">Настройки хранятся только в этом браузере.</p>
+		<div class="actions">
+			<button class="button primary" type="button" data-close>Готово</button>
+		</div>
+	</div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

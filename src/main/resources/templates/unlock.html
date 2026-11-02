@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Net Notepad · пароль</title>
+	<link rel="stylesheet" th:href="@{/css/app.css}">
+	<script th:src="@{/js/theme.js}"></script>
+</head>
+<body class="centered-page">
+<form class="card" method="post" th:action="@{${action}}">
+	<h1>Заметка защищена паролем</h1>
+	<p class="muted">Введите пароль, чтобы открыть заметку.</p>
+	<input class="input" type="password" name="password" autocomplete="current-password" autofocus required
+		   aria-label="Пароль">
+	<p class="error" th:if="${error}" th:text="${error}"></p>
+	<div class="actions">
+		<a class="button" th:href="@{/new}">Новая заметка</a>
+		<button class="button primary" type="submit">Открыть</button>
+	</div>
+</form>
+</body>
+</html>

@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: net-notepad
+  sql:
+    init:
+      mode: always
+  docker:
+    compose:
+      # compose.yaml runs the whole application, development needs only the database
+      file: compose.dev.yaml
+
+netnotepad:
+  # Maximum note length in characters
+  max-note-length: 1000000
+  # How long an unused note stays in memory after the last participant leaves
+  idle-eviction: 60s
+
+server:
+  compression:
+    enabled: true
+  servlet:
+    session:
+      # Never put the session id into URLs: it holds the notes unlocked with a password
+      tracking-modes: cookie
+      cookie:
+        http-only: true
+        same-site: lax

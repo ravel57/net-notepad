@@ -1,0 +1,10 @@
+.git
+.gradle
+.kotlin
+.idea
+.claude
+*.iml
+build
+frontend/node_modules
+compose*.yaml
+Dockerfile
