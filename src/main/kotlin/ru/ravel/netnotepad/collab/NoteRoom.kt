@@ -25,6 +25,8 @@ import kotlin.concurrent.withLock
  */
 class NoteRoom(
 	note: Note,
+	/** Whether the note is already stored in the database. */
+	private val persisted: Boolean,
 	private val maxNoteLength: Int,
 	private val maxParticipants: Int,
 	private val mapper: JsonMapper,
@@ -43,6 +45,7 @@ class NoteRoom(
 	private var preview = note.preview
 	private var passwordHash = note.passwordHash
 	private var expiresAt = note.expiresAt
+	private var ownerKey = note.ownerKey
 	private var version = 0
 	private var dirty = false
 	private var closed = false
@@ -62,6 +65,11 @@ class NoteRoom(
 		}
 		participants += participant
 		idleSince = null
+		// The creator is the first editor to open a new note; notes created before ownership existed are claimed the same way
+		if (ownerKey == null && !participant.readOnly && participant.clientKey != null) {
+			ownerKey = participant.clientKey
+			if (persisted) dirty = true
+		}
 		val missed = if (clientEpoch == epoch && clientVersion != null) updatesSince(clientVersion) else null
 		if (missed != null) {
 			send(participant, mapOf("type" to "resume", "updates" to missed))
@@ -74,6 +82,7 @@ class NoteRoom(
 					"doc" to doc,
 					"you" to participant.id,
 					"readOnly" to participant.readOnly,
+					"owner" to isOwner(participant),
 					// The read-only link must not reveal the editable one, and vice versa is fine
 					"readId" to if (participant.readOnly) null else readId,
 				) + settings() + protection()
@@ -104,9 +113,10 @@ class NoteRoom(
 		commit(newDoc, updates)
 	}
 
+	/** Any editor may change the syntax, only the owner splits the screen for everyone. */
 	fun changeSettings(participant: Participant, newSyntax: Syntax, newPreview: Boolean) = lock.withLock {
 		checkEditor(participant)
-		applySettings(newSyntax, newPreview)
+		applySettings(newSyntax, if (isOwner(participant)) newPreview else preview)
 	}
 
 	fun changeProfile(participant: Participant, name: String, color: String) = lock.withLock {
@@ -130,7 +140,7 @@ class NoteRoom(
 	 * @param ttl new lifetime, [Duration.ZERO] for unlimited, `null` to keep it
 	 */
 	fun protect(participant: Participant, passwordHash: String?, ttl: Duration?) = lock.withLock {
-		checkEditor(participant)
+		checkOwner(participant)
 		if (passwordHash != null) {
 			this.passwordHash = passwordHash.ifEmpty { null }
 			// Whoever is already in keeps access after reloading the page
@@ -150,7 +160,7 @@ class NoteRoom(
 
 	/** Replaces the whole document as a regular update so that connected editors keep their local changes. */
 	fun restore(participant: Participant, content: String, restoredSyntax: Syntax) = lock.withLock {
-		checkEditor(participant)
+		checkOwner(participant)
 		if (content != doc) {
 			val changes = JsonNodeFactory.instance.arrayNode().add(
 				JsonNodeFactory.instance.arrayNode().add(doc.length).apply { content.split('\n').forEach(::add) }
@@ -168,7 +178,9 @@ class NoteRoom(
 		participants.clear()
 	}
 
-	fun currentNote(): Note = lock.withLock { Note(id, readId, doc, syntax, preview, passwordHash, expiresAt) }
+	fun currentNote(): Note = lock.withLock { Note(id, readId, doc, syntax, preview, passwordHash, expiresAt, ownerKey) }
+
+	fun isOwnedBy(clientKey: String?): Boolean = lock.withLock { clientKey != null && clientKey == ownerKey }
 
 	/** Returns the current note if it changed since the last call. */
 	fun takeSnapshotIfDirty(): Note? = lock.withLock {
@@ -208,6 +220,13 @@ class NoteRoom(
 		check(!participant.readOnly) { "read-only participant" }
 	}
 
+	private fun checkOwner(participant: Participant) {
+		check(isOwner(participant)) { "only the creator of the note can do this" }
+	}
+
+	private fun isOwner(participant: Participant) =
+		!participant.readOnly && participant.clientKey != null && participant.clientKey == ownerKey
+
 	private fun updatesSince(clientVersion: Int): List<Update>? {
 		val first = version - history.size
 		if (clientVersion !in first..version) return null
@@ -219,7 +238,7 @@ class NoteRoom(
 	private fun protection() = mapOf("hasPassword" to (passwordHash != null), "expiresAt" to expiresAt?.toString())
 
 	private fun broadcastPresence() =
-		broadcast(mapOf("type" to "presence", "users" to participants.map(Participant::toJson)))
+		broadcast(mapOf("type" to "presence", "users" to participants.map { it.toJson(isOwner(it)) }))
 
 	private fun broadcast(message: Map<String, Any?>) {
 		val text = TextMessage(mapper.writeValueAsString(message))

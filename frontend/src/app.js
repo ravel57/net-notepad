@@ -56,6 +56,8 @@ let settings = {syntax: "plain", preview: false};
 let protection = {hasPassword: false, expiresAt: null};
 let readId = readOnly ? noteKey : null;
 let myId = null;
+/** Whether this browser created the note; the server enforces the same rights. */
+let isOwner = false;
 let users = [];
 /** Set when the note is gone or inaccessible; stops reconnecting. */
 let stopReason = null;
@@ -129,6 +131,8 @@ function handleMessage(message) {
 		case "init":
 			epoch = message.epoch;
 			myId = message.you;
+			isOwner = message.owner;
+			document.body.classList.toggle("owner", isOwner);
 			pushing = false;
 			receivedChanges.length = 0;
 			if (message.readId) readId = message.readId;
@@ -263,7 +267,8 @@ function applyPresence(list) {
 		avatar.className = user.id === myId ? "avatar self" : "avatar";
 		avatar.style.background = user.color;
 		avatar.textContent = user.name.trim().charAt(0).toUpperCase() || "?";
-		avatar.title = user.name + (user.id === myId ? " (вы)" : "") + (user.readOnly ? " · только чтение" : "");
+		avatar.title = user.name + (user.id === myId ? " (вы)" : "") +
+			(user.owner ? " · создатель" : "") + (user.readOnly ? " · только чтение" : "");
 		return avatar;
 	}));
 	if (users.length > 6) {
@@ -299,7 +304,7 @@ const fileDrop = EditorView.domEventHandlers({
 		const file = event.dataTransfer?.files?.[0];
 		if (!file) return false;
 		event.preventDefault();
-		if (!readOnly && !stopReason) loadFile(file);
+		if (isOwner && !stopReason) loadFile(file);
 		return true;
 	},
 });

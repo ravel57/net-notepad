@@ -1,5 +1,6 @@
 package ru.ravel.netnotepad.web
 
+import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpSession
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.GetMapping
@@ -12,7 +13,7 @@ import ru.ravel.netnotepad.note.NoteAccess
 import ru.ravel.netnotepad.note.NoteRepository
 import java.time.Instant
 
-/** Version history; available to editors only, since the path contains the editable id. */
+/** Version history; available to the creator of the note only. */
 @RestController
 @RequestMapping("/api/notes/{id}/versions")
 class VersionController(
@@ -25,20 +26,26 @@ class VersionController(
 	data class VersionContent(val id: Long, val createdAt: Instant, val content: String, val syntax: String)
 
 	@GetMapping
-	fun list(@PathVariable id: String, session: HttpSession): List<VersionSummary> {
-		checkAccess(id, session)
+	fun list(@PathVariable id: String, request: HttpServletRequest, session: HttpSession): List<VersionSummary> {
+		checkAccess(id, request, session)
 		return repository.findVersions(id).map { VersionSummary(it.id, it.createdAt, it.content.length, it.syntax.code) }
 	}
 
 	@GetMapping("/{versionId}")
-	fun get(@PathVariable id: String, @PathVariable versionId: Long, session: HttpSession): VersionContent {
-		checkAccess(id, session)
+	fun get(
+		@PathVariable id: String,
+		@PathVariable versionId: Long,
+		request: HttpServletRequest,
+		session: HttpSession,
+	): VersionContent {
+		checkAccess(id, request, session)
 		val version = repository.findVersion(id, versionId) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 		return VersionContent(version.id, version.createdAt, version.content, version.syntax.code)
 	}
 
-	private fun checkAccess(id: String, session: HttpSession) {
-		if (rooms.isPasswordProtected(id) && !NoteAccess.isUnlocked(session, id)) {
+	private fun checkAccess(id: String, request: HttpServletRequest, session: HttpSession) {
+		val unlocked = !rooms.isPasswordProtected(id) || NoteAccess.isUnlocked(session, id)
+		if (!unlocked || !rooms.isOwner(id, ClientKeyFilter.clientKey(request))) {
 			throw ResponseStatusException(HttpStatus.FORBIDDEN)
 		}
 	}

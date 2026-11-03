@@ -46,7 +46,14 @@ class NoteRooms(
 		return Passwords.verify(password, hash)
 	}
 
+	fun isOwner(noteId: String, clientKey: String?): Boolean {
+		if (clientKey == null) return false
+		rooms[noteId]?.let { return it.isOwnedBy(clientKey) }
+		return repository.find(noteId)?.ownerKey == clientKey
+	}
+
 	fun restore(room: NoteRoom, participant: Participant, versionId: Long) {
+		require(room.isOwnedBy(participant.clientKey) && !participant.readOnly) { "only the creator of the note can do this" }
 		val version = requireNotNull(repository.findVersion(room.id, versionId)) { "version not found" }
 		// Keep the state being replaced so that the restore itself can be undone
 		val current = room.currentNote()
@@ -96,9 +103,10 @@ class NoteRooms(
 			repository.delete(id)
 			note = null
 		}
+		val persisted = note != null
 		note = note ?: Note.empty(id)
 		readIds[note.readId] = id
-		return NoteRoom(note, properties.maxNoteLength, properties.limits.participantsPerNote, mapper)
+		return NoteRoom(note, persisted, properties.maxNoteLength, properties.limits.participantsPerNote, mapper)
 	}
 
 	private fun save(room: NoteRoom) {

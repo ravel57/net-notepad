@@ -11,6 +11,8 @@ data class Note(
 	val preview: Boolean,
 	val passwordHash: String? = null,
 	val expiresAt: Instant? = null,
+	/** Hashed browser key of the creator, see `ClientKeyFilter`. */
+	val ownerKey: String? = null,
 ) {
 	companion object {
 		fun empty(id: String) = Note(id, NoteIds.generate(), "", Syntax.PLAIN, false)

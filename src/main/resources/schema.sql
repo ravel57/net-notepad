@@ -24,3 +24,6 @@ create table if not exists note_versions
 );
 
 create index if not exists note_versions_note_idx on note_versions (note_id, created_at desc);
+
+-- Hashed browser key of the creator; the creator alone manages preview, files, history and access
+alter table notes add column if not exists owner_key varchar(64);

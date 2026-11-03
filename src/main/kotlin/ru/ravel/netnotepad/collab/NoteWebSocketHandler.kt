@@ -54,7 +54,8 @@ class NoteWebSocketHandler(
 			session = ConcurrentWebSocketSessionDecorator(session, SEND_TIME_LIMIT_MS, WebSocketConfig.MAX_MESSAGE_SIZE * 2),
 			id = NoteIds.generate(),
 			readOnly = readOnly,
-			httpSession = session.attributes[HttpSessionInterceptor.HTTP_SESSION] as? HttpSession,
+			httpSession = session.attributes[ClientHandshakeInterceptor.HTTP_SESSION] as? HttpSession,
+			clientKey = session.attributes[ClientHandshakeInterceptor.CLIENT_KEY] as? String,
 			messageLimit = rateLimits.newMessageBucket(),
 		)
 		val (room, result) = rooms.join(noteId, participant, params.getFirst("epoch"), params.getFirst("version")?.toIntOrNull())

@@ -11,6 +11,8 @@ class Participant(
 	val id: String,
 	val readOnly: Boolean,
 	val httpSession: HttpSession?,
+	/** Hashed browser key, see `ClientKeyFilter`. */
+	val clientKey: String?,
 	val messageLimit: TokenBucket,
 ) {
 	@Volatile
@@ -19,5 +21,5 @@ class Participant(
 	@Volatile
 	var color: String = "#7c8495"
 
-	fun toJson() = mapOf("id" to id, "name" to name, "color" to color, "readOnly" to readOnly)
+	fun toJson(owner: Boolean) = mapOf("id" to id, "name" to name, "color" to color, "readOnly" to readOnly, "owner" to owner)
 }

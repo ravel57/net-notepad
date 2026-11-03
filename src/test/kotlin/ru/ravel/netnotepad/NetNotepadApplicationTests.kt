@@ -20,6 +20,8 @@ import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.security.SecureRandom
+import java.util.Base64
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -88,9 +90,12 @@ class NetNotepadApplicationTests {
 		val init = a.await("init")
 		assertEquals("", init["doc"].asString())
 		assertEquals(0, init["version"].asInt())
+		assertEquals(true, init["owner"].asBoolean(), "the first editor creates the note")
 
 		val b = editor(noteId)
-		val bId = b.await("init")["you"].asString()
+		val bInit = b.await("init")
+		val bId = bInit["you"].asString()
+		assertEquals(false, bInit["owner"].asBoolean())
 		a.await("presence") { it["users"].size() == 2 }
 
 		b.send("""{"type":"profile","name":"Боб","color":"#00ff00"}""")
@@ -111,8 +116,13 @@ class NetNotepadApplicationTests {
 		assertEquals(bId, cursor["id"].asString())
 		assertEquals(5, cursor["ranges"][0][1].asInt())
 
+		// Any editor changes the syntax, only the creator splits the screen
 		b.send("""{"type":"settings","syntax":"markdown","preview":true}""")
-		assertEquals(true, a.await("settings")["preview"].asBoolean())
+		val bSettings = a.await("settings")
+		assertEquals("markdown", bSettings["syntax"].asString())
+		assertEquals(false, bSettings["preview"].asBoolean())
+		a.send("""{"type":"settings","syntax":"markdown","preview":true}""")
+		assertEquals(true, b.await("settings") { it["preview"].asBoolean() }["preview"].asBoolean())
 		a.send("""{"type":"settings","syntax":"java","preview":true}""")
 		val javaSettings = b.await("settings") { it["syntax"].asString() == "java" }
 		assertEquals(false, javaSettings["preview"].asBoolean())
@@ -160,15 +170,39 @@ class NetNotepadApplicationTests {
 
 		val unlocked = unlock(noteId, "s3cret")
 		assertEquals(302, unlocked.statusCode())
-		val cookie = unlocked.headers().firstValue("Set-Cookie").get().substringBefore(';')
+		val cookie = unlocked.headers().allValues("Set-Cookie").joinToString("; ") { it.substringBefore(';') }
 		editor(noteId, cookie).await("init")
 		editor.session.close()
 	}
 
 	@Test
+	fun `only the creator manages access and history`() {
+		val noteId = NoteIds.generate()
+		val ownerCookie = browserCookie()
+		val owner = editor(noteId, ownerCookie)
+		owner.await("init")
+		owner.send("""{"type":"push","version":0,"updates":[{"clientID":"a","changes":[[0,"text"]]}]}""")
+		owner.await("updates")
+		rooms.flush()
+
+		val otherCookie = browserCookie()
+		val other = editor(noteId, otherCookie)
+		assertEquals(false, other.await("init")["owner"].asBoolean())
+		assertEquals(403, get("/api/notes/$noteId/versions", otherCookie).statusCode())
+		assertEquals(200, get("/api/notes/$noteId/versions", ownerCookie).statusCode())
+		other.send("""{"type":"protect","password":"mine"}""")
+		other.await("error")
+
+		// The creator is recognized again by the browser cookie
+		owner.session.close()
+		assertEquals(true, editor(noteId, ownerCookie).await("init")["owner"].asBoolean())
+	}
+
+	@Test
 	fun `versions can be listed and restored`() {
 		val noteId = NoteIds.generate()
-		val editor = editor(noteId)
+		val cookie = browserCookie()
+		val editor = editor(noteId, cookie)
 		editor.await("init")
 		editor.send("""{"type":"push","version":0,"updates":[{"clientID":"a","changes":[[0,"first"]]}]}""")
 		editor.await("updates")
@@ -176,7 +210,7 @@ class NetNotepadApplicationTests {
 		editor.send("""{"type":"push","version":1,"updates":[{"clientID":"a","changes":[[5,"second"]]}]}""")
 		editor.await("updates")
 
-		val versions = mapper.readTree(get("/api/notes/$noteId/versions").body())
+		val versions = mapper.readTree(get("/api/notes/$noteId/versions", cookie).body())
 		assertEquals(1, versions.size())
 		editor.send("""{"type":"restore","versionId":${versions[0]["id"].asLong()}}""")
 		val restore = editor.await("updates")["updates"][0]
@@ -184,7 +218,7 @@ class NetNotepadApplicationTests {
 		assertEquals("first", restore["changes"][0][1].asString())
 
 		// The replaced state is kept as a version too
-		assertEquals(2, mapper.readTree(get("/api/notes/$noteId/versions").body()).size())
+		assertEquals(2, mapper.readTree(get("/api/notes/$noteId/versions", cookie).body()).size())
 		editor.session.close()
 	}
 
@@ -210,8 +244,14 @@ class NetNotepadApplicationTests {
 		assertNull(rooms.resolveReadId(NoteIds.generate()))
 	}
 
-	private fun get(path: String): HttpResponse<String> =
-		http.send(HttpRequest.newBuilder(URI("http://localhost:$port$path")).build(), HttpResponse.BodyHandlers.ofString())
+	private fun get(path: String, cookie: String? = null): HttpResponse<String> = http.send(
+		HttpRequest.newBuilder(URI("http://localhost:$port$path")).apply { cookie?.let { header("Cookie", it) } }.build(),
+		HttpResponse.BodyHandlers.ofString(),
+	)
+
+	/** Identifies a browser, see ClientKeyFilter. */
+	private fun browserCookie() =
+		"nn_client=" + Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32).also(SecureRandom()::nextBytes))
 
 	private fun unlock(noteId: String, password: String): HttpResponse<String> = http.send(
 		HttpRequest.newBuilder(URI("http://localhost:$port/$noteId/unlock"))

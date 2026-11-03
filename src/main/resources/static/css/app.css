@@ -143,6 +143,11 @@ body.read-only [data-edit-only] {
 	display: none;
 }
 
+/* Preview, files, history and access belong to the creator of the note */
+body:not(.owner) [data-owner-only] {
+	display: none;
+}
+
 .button.primary, .button.toggle[aria-pressed="true"] {
 	background: var(--accent);
 	border-color: var(--accent);

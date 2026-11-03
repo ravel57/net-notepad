@@ -13,7 +13,7 @@ class NoteRepository(
 ) {
 
 	fun find(id: String): Note? = jdbc.sql(
-		"select id, read_id, content, syntax, preview, password_hash, expires_at from notes where id = :id"
+		"select id, read_id, content, syntax, preview, password_hash, expires_at, owner_key from notes where id = :id"
 	)
 		.param("id", id)
 		.query { rs, _ ->
@@ -25,6 +25,7 @@ class NoteRepository(
 				preview = rs.getBoolean("preview"),
 				passwordHash = rs.getString("password_hash"),
 				expiresAt = rs.getTimestamp("expires_at")?.toInstant(),
+				ownerKey = rs.getString("owner_key"),
 			)
 		}
 		.optional()
@@ -39,14 +40,15 @@ class NoteRepository(
 	fun save(note: Note) {
 		jdbc.sql(
 			"""
-			insert into notes (id, read_id, content, syntax, preview, password_hash, expires_at)
-			values (:id, :readId, :content, :syntax, :preview, :passwordHash, :expiresAt)
+			insert into notes (id, read_id, content, syntax, preview, password_hash, expires_at, owner_key)
+			values (:id, :readId, :content, :syntax, :preview, :passwordHash, :expiresAt, :ownerKey)
 			on conflict (id) do update
 			set content = excluded.content,
 			    syntax = excluded.syntax,
 			    preview = excluded.preview,
 			    password_hash = excluded.password_hash,
 			    expires_at = excluded.expires_at,
+			    owner_key = excluded.owner_key,
 			    updated_at = now()
 			""".trimIndent()
 		)
@@ -57,6 +59,7 @@ class NoteRepository(
 			.param("preview", note.preview)
 			.param("passwordHash", note.passwordHash)
 			.param("expiresAt", note.expiresAt?.let(Timestamp::from))
+			.param("ownerKey", note.ownerKey)
 			.update()
 	}
 

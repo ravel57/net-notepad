@@ -23,18 +23,18 @@
 			<span>Синтаксис</span>
 			<select id="syntax"></select>
 		</label>
-		<button id="preview-toggle" class="button toggle" type="button" aria-pressed="false"
+		<button id="preview-toggle" class="button toggle" type="button" aria-pressed="false" data-owner-only
 				title="Разделить экран у всех участников: текст и отрисованный Markdown">
 			Превью Markdown
 		</button>
 	</div>
 	<div class="group">
-		<button id="download" class="button" type="button" title="Скачать заметку файлом">Скачать</button>
-		<button id="upload" class="button" type="button" data-edit-only
+		<button id="download" class="button" type="button" data-owner-only title="Скачать заметку файлом">Скачать</button>
+		<button id="upload" class="button" type="button" data-owner-only
 				title="Заменить заметку содержимым файла (можно перетащить файл в редактор)">Загрузить</button>
 		<input id="upload-input" type="file" hidden>
-		<button id="history" class="button" type="button" data-edit-only>История</button>
-		<button id="protection" class="button" type="button" data-edit-only title="Пароль и срок жизни">Доступ</button>
+		<button id="history" class="button" type="button" data-owner-only>История</button>
+		<button id="protection" class="button" type="button" data-owner-only title="Пароль и срок жизни">Доступ</button>
 		<button id="settings" class="button" type="button">Настройки</button>
 	</div>
 	<div class="presence-bar">
