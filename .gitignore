@@ -42,3 +42,4 @@ out/
 
 ### Database data of docker-compose.yaml ###
 /pgdata/
+/.env
