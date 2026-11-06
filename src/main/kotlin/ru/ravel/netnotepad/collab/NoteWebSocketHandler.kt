@@ -91,6 +91,7 @@ class NoteWebSocketHandler(
 					json.path("preview").asBoolean(false),
 				)
 
+				"stopwatch" -> room.controlStopwatch(participant, parseStopwatchAction(json.path("action")))
 				"protect" -> room.protect(participant, parsePassword(json), parseTtl(json))
 				"restore" -> rooms.restore(room, participant, json.path("versionId").asLong(-1))
 				// Makes sure an untouched note is saved, so that its read-only link works
@@ -133,6 +134,10 @@ class NoteWebSocketHandler(
 
 	private fun parseColor(json: JsonNode): String =
 		json.asString("").takeIf { COLOR.matches(it) } ?: "#7c8495"
+
+	private fun parseStopwatchAction(json: JsonNode): NoteRoom.StopwatchAction =
+		NoteRoom.StopwatchAction.entries.firstOrNull { it.name.equals(json.asString(""), ignoreCase = true) }
+			?: throw IllegalArgumentException("unknown stopwatch action")
 
 	/** `null` keeps the password, `""` removes it. */
 	private fun parsePassword(json: JsonNode): String? {

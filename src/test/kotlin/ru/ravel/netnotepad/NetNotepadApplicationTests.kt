@@ -13,6 +13,7 @@ import org.springframework.web.socket.client.standard.StandardWebSocketClient
 import org.springframework.web.socket.handler.TextWebSocketHandler
 import ru.ravel.netnotepad.collab.NoteRooms
 import ru.ravel.netnotepad.note.NoteIds
+import ru.ravel.netnotepad.note.NoteRepository
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import java.net.URI
@@ -48,6 +49,9 @@ class NetNotepadApplicationTests {
 
 	@Autowired
 	private lateinit var rooms: NoteRooms
+
+	@Autowired
+	private lateinit var notes: NoteRepository
 
 	private val http = HttpClient.newHttpClient()
 
@@ -196,6 +200,36 @@ class NetNotepadApplicationTests {
 		// The creator is recognized again by the browser cookie
 		owner.session.close()
 		assertEquals(true, editor(noteId, ownerCookie).await("init")["owner"].asBoolean())
+	}
+
+	@Test
+	fun `stopwatch is shared by everyone in the note`() {
+		val noteId = NoteIds.generate()
+		val a = editor(noteId)
+		val readId = a.await("init")["readId"].asString()
+		assertEquals(false, a.await("stopwatch")["running"].asBoolean())
+		val b = editor(noteId)
+		b.await("stopwatch")
+
+		a.send("""{"type":"stopwatch","action":"start"}""")
+		b.await("stopwatch") { it["running"].asBoolean() }
+		Thread.sleep(50)
+		b.send("""{"type":"stopwatch","action":"pause"}""")
+		val paused = a.await("stopwatch") { !it["running"].asBoolean() }
+		assertTrue(paused["elapsed"].asLong() >= 50)
+
+		// Newcomers and viewers see the current state, but viewers cannot control it
+		val viewer = Client("view/$readId")
+		assertEquals(paused["elapsed"].asLong(), viewer.await("stopwatch")["elapsed"].asLong())
+		viewer.send("""{"type":"stopwatch","action":"reset"}""")
+		viewer.await("error")
+
+		// The state is saved with the note
+		rooms.flush()
+		val saved = assertNotNull(notes.find(noteId)).stopwatch
+		assertEquals(false, saved.running)
+		assertEquals(paused["elapsed"].asLong(), saved.elapsed.toMillis())
+		listOf(a, b, viewer).forEach { it.session.close() }
 	}
 
 	@Test

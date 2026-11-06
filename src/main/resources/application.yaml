@@ -7,8 +7,8 @@ spring:
   # Local database for development and tests; docker-compose.yaml overrides it with SPRING_DATASOURCE_* variables
   datasource:
     url: jdbc:postgresql://localhost:5432/netnotepad
-    username: netnotepad
-    password: netnotepad
+    username: postgres
+    password: postgres
 
 netnotepad:
   # Maximum note length in characters

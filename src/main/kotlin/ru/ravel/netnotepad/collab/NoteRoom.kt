@@ -6,6 +6,7 @@ import org.springframework.web.socket.TextMessage
 import ru.ravel.netnotepad.note.Note
 import ru.ravel.netnotepad.note.NoteAccess
 import ru.ravel.netnotepad.note.Passwords
+import ru.ravel.netnotepad.note.Stopwatch
 import ru.ravel.netnotepad.note.Syntax
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
@@ -46,6 +47,7 @@ class NoteRoom(
 	private var passwordHash = note.passwordHash
 	private var expiresAt = note.expiresAt
 	private var ownerKey = note.ownerKey
+	private var stopwatch = note.stopwatch
 	private var version = 0
 	private var dirty = false
 	private var closed = false
@@ -54,6 +56,8 @@ class NoteRoom(
 	data class Update(val clientID: String, val changes: JsonNode)
 
 	enum class JoinResult { JOINED, LOCKED, FULL, CLOSED }
+
+	enum class StopwatchAction { START, PAUSE, RESET }
 
 	val hasPassword: Boolean get() = lock.withLock { passwordHash != null }
 
@@ -88,6 +92,7 @@ class NoteRoom(
 				) + settings() + protection()
 			)
 		}
+		send(participant, stopwatchMessage())
 		broadcastPresence()
 		JoinResult.JOINED
 	}
@@ -117,6 +122,23 @@ class NoteRoom(
 	fun changeSettings(participant: Participant, newSyntax: Syntax, newPreview: Boolean) = lock.withLock {
 		checkEditor(participant)
 		applySettings(newSyntax, if (isOwner(participant)) newPreview else preview)
+	}
+
+	/** Any editor controls the stopwatch; viewers only see it. */
+	fun controlStopwatch(participant: Participant, action: StopwatchAction) = lock.withLock {
+		checkEditor(participant)
+		val now = Instant.now()
+		val next = when (action) {
+			StopwatchAction.START -> stopwatch.start(now)
+			StopwatchAction.PAUSE -> stopwatch.pause(now)
+			StopwatchAction.RESET -> Stopwatch()
+		}
+		if (next != stopwatch) {
+			stopwatch = next
+			dirty = true
+		}
+		// Sent even without a change, so that the sender drops its optimistic state
+		broadcast(stopwatchMessage())
 	}
 
 	fun changeProfile(participant: Participant, name: String, color: String) = lock.withLock {
@@ -178,7 +200,8 @@ class NoteRoom(
 		participants.clear()
 	}
 
-	fun currentNote(): Note = lock.withLock { Note(id, readId, doc, syntax, preview, passwordHash, expiresAt, ownerKey) }
+	fun currentNote(): Note =
+		lock.withLock { Note(id, readId, doc, syntax, preview, passwordHash, expiresAt, ownerKey, stopwatch) }
 
 	fun isOwnedBy(clientKey: String?): Boolean = lock.withLock { clientKey != null && clientKey == ownerKey }
 
@@ -236,6 +259,13 @@ class NoteRoom(
 	private fun settings() = mapOf("syntax" to syntax.code, "preview" to preview)
 
 	private fun protection() = mapOf("hasPassword" to (passwordHash != null), "expiresAt" to expiresAt?.toString())
+
+	/** Clients count from the elapsed time instead of the start instant, so their clocks need not match the server's. */
+	private fun stopwatchMessage() = mapOf(
+		"type" to "stopwatch",
+		"running" to stopwatch.running,
+		"elapsed" to stopwatch.elapsedAt(Instant.now()).toMillis(),
+	)
 
 	private fun broadcastPresence() =
 		broadcast(mapOf("type" to "presence", "users" to participants.map { it.toJson(isOwner(it)) }))

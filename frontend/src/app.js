@@ -29,7 +29,9 @@ import {remoteCursors, setRemoteSelection, setRemoteUsers} from "./cursors.js";
 import {renderMarkdown, setPreviewDark} from "./preview.js";
 import {isDark, loadPrefs, onSystemThemeChange, savePrefs} from "./prefs.js";
 import {setupHistoryDialog, setupProtectionDialog, setupSettingsDialog, setupShareDialog} from "./dialogs.js";
-import {copyText, formatDate, plural, toast} from "./util.js";
+import {formatDate, plural, toast} from "./util.js";
+import {setupStopwatch} from "./stopwatch.js";
+import {setupMenu} from "./menu.js";
 
 const $ = id => document.getElementById(id);
 
@@ -164,6 +166,9 @@ function handleMessage(message) {
 			break;
 		case "cursor":
 			applyRemoteCursor(message);
+			break;
+		case "stopwatch":
+			applyStopwatch(message);
 			break;
 		case "expired":
 			stop("Заметка удалена: истёк срок её жизни");
@@ -369,7 +374,7 @@ function createEditor(doc, version) {
 function applySettings({syntax, preview}) {
 	settings = {syntax, preview};
 	syntaxSelect.value = syntax;
-	previewButton.setAttribute("aria-pressed", String(preview));
+	previewButton.setAttribute("aria-checked", String(preview));
 	workspaceEl.classList.toggle("split", preview);
 	previewEl.parentElement.hidden = !preview;
 	view?.dispatch({effects: languageConf.reconfigure(syntaxByCode(syntax).support)});
@@ -474,10 +479,10 @@ const openHistory = setupHistoryDialog({
 
 const protectionDialog = setupProtectionDialog({send});
 
-$("copy-link").addEventListener("click", async () => {
-	await copyText(links().edit ?? links().read);
-	toast("Ссылка скопирована");
-});
+const applyStopwatch = setupStopwatch({send});
+
+setupMenu($("note-menu-button"), $("note-menu"));
+
 $("share").addEventListener("click", openShare);
 $("history").addEventListener("click", openHistory);
 $("protection").addEventListener("click", protectionDialog.open);

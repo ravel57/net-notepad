@@ -10,8 +10,8 @@ services:
       - '${APP_PORT:-8080}:8080'
     environment:
       SPRING_DATASOURCE_URL: 'jdbc:postgresql://postgres:5432/${POSTGRES_DB:-netnotepad}'
-      SPRING_DATASOURCE_USERNAME: '${POSTGRES_USER:-netnotepad}'
-      SPRING_DATASOURCE_PASSWORD: '${POSTGRES_PASSWORD:-netnotepad}'
+      SPRING_DATASOURCE_USERNAME: '${POSTGRES_USER:-postgres}'
+      SPRING_DATASOURCE_PASSWORD: '${POSTGRES_PASSWORD:-postgres}'
     depends_on:
       postgres:
         condition: service_healthy

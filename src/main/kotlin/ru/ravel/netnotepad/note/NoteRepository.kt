@@ -13,7 +13,8 @@ class NoteRepository(
 ) {
 
 	fun find(id: String): Note? = jdbc.sql(
-		"select id, read_id, content, syntax, preview, password_hash, expires_at, owner_key from notes where id = :id"
+		"select id, read_id, content, syntax, preview, password_hash, expires_at, owner_key, stopwatch_elapsed_ms, stopwatch_started_at " +
+				"from notes where id = :id"
 	)
 		.param("id", id)
 		.query { rs, _ ->
@@ -26,6 +27,10 @@ class NoteRepository(
 				passwordHash = rs.getString("password_hash"),
 				expiresAt = rs.getTimestamp("expires_at")?.toInstant(),
 				ownerKey = rs.getString("owner_key"),
+				stopwatch = Stopwatch(
+					Duration.ofMillis(rs.getLong("stopwatch_elapsed_ms")),
+					rs.getTimestamp("stopwatch_started_at")?.toInstant(),
+				),
 			)
 		}
 		.optional()
@@ -40,8 +45,10 @@ class NoteRepository(
 	fun save(note: Note) {
 		jdbc.sql(
 			"""
-			insert into notes (id, read_id, content, syntax, preview, password_hash, expires_at, owner_key)
-			values (:id, :readId, :content, :syntax, :preview, :passwordHash, :expiresAt, :ownerKey)
+			insert into notes (id, read_id, content, syntax, preview, password_hash, expires_at, owner_key,
+			                   stopwatch_elapsed_ms, stopwatch_started_at)
+			values (:id, :readId, :content, :syntax, :preview, :passwordHash, :expiresAt, :ownerKey,
+			        :stopwatchElapsedMs, :stopwatchStartedAt)
 			on conflict (id) do update
 			set content = excluded.content,
 			    syntax = excluded.syntax,
@@ -49,6 +56,8 @@ class NoteRepository(
 			    password_hash = excluded.password_hash,
 			    expires_at = excluded.expires_at,
 			    owner_key = excluded.owner_key,
+			    stopwatch_elapsed_ms = excluded.stopwatch_elapsed_ms,
+			    stopwatch_started_at = excluded.stopwatch_started_at,
 			    updated_at = now()
 			""".trimIndent()
 		)
@@ -60,6 +69,8 @@ class NoteRepository(
 			.param("passwordHash", note.passwordHash)
 			.param("expiresAt", note.expiresAt?.let(Timestamp::from))
 			.param("ownerKey", note.ownerKey)
+			.param("stopwatchElapsedMs", note.stopwatch.elapsed.toMillis())
+			.param("stopwatchStartedAt", note.stopwatch.startedAt?.let(Timestamp::from))
 			.update()
 	}
 

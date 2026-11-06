@@ -126,6 +126,31 @@ body {
 	white-space: nowrap;
 }
 
+.button[hidden] {
+	display: none;
+}
+
+.button.icon {
+	justify-content: center;
+	width: 32px;
+	padding: 0;
+}
+
+.button.icon svg {
+	width: 16px;
+	height: 16px;
+	fill: currentColor;
+}
+
+.button.icon svg[fill="none"] {
+	fill: none;
+}
+
+.button.toggle[aria-pressed="true"] .icon-play,
+.button.toggle:not([aria-pressed="true"]) .icon-pause {
+	display: none;
+}
+
 .button:hover:not(:disabled), select:hover:not(:disabled) {
 	border-color: var(--accent);
 }
@@ -154,11 +179,91 @@ body:not(.owner) [data-owner-only] {
 	color: var(--accent-text);
 }
 
+.menu {
+	position: relative;
+}
+
+.menu-chevron {
+	width: 12px;
+	height: 12px;
+	margin-left: 6px;
+}
+
+.menu-list {
+	position: absolute;
+	top: calc(100% + 4px);
+	left: 0;
+	z-index: 20;
+	display: flex;
+	flex-direction: column;
+	min-width: 200px;
+	padding: 4px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: var(--surface);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, .18);
+}
+
+.menu-list[hidden] {
+	display: none;
+}
+
+.menu-item {
+	position: relative;
+	height: 32px;
+	padding: 0 12px 0 30px;
+	border: 0;
+	border-radius: 6px;
+	background: none;
+	color: var(--text);
+	font: inherit;
+	text-align: left;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.menu-item:hover:not(:disabled), .menu-item:focus-visible {
+	background: var(--surface-2);
+	outline: none;
+}
+
+.menu-item:disabled {
+	opacity: .55;
+	cursor: default;
+}
+
+/* Check mark of a switched-on option */
+.menu-item[aria-checked="true"]::before {
+	content: "";
+	position: absolute;
+	left: 12px;
+	top: 50%;
+	width: 5px;
+	height: 9px;
+	border: solid var(--accent);
+	border-width: 0 2px 2px 0;
+	transform: translateY(-65%) rotate(45deg);
+}
+
+.menu-separator {
+	width: 100%;
+	margin: 4px 0;
+	border: 0;
+	border-top: 1px solid var(--border);
+}
+
 .select {
 	display: flex;
 	align-items: center;
 	gap: 6px;
 	color: var(--muted);
+}
+
+.stopwatch-time {
+	min-width: 5ch;
+	font: 15px var(--font-mono);
+	font-variant-numeric: tabular-nums;
+	text-align: right;
 }
 
 .presence-bar {

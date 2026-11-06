@@ -27,3 +27,7 @@ create index if not exists note_versions_note_idx on note_versions (note_id, cre
 
 -- Hashed browser key of the creator; the creator alone manages preview, files, history and access
 alter table notes add column if not exists owner_key varchar(64);
+
+-- Stopwatch shared by everyone in the note
+alter table notes add column if not exists stopwatch_elapsed_ms bigint not null default 0;
+alter table notes add column if not exists stopwatch_started_at timestamptz;
